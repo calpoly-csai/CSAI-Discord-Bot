@@ -4,6 +4,7 @@ import Event from "../../classes/Event";
 import Command from "../../classes/Command";
 import { RecurrenceRule, scheduleJob } from "node-schedule";
 import getDiscordEventsJob from "../../../jobs/syncDiscordEventsJob";
+import getInternshipOppertunitiesJob from "../../../jobs/fetchInternships";
 import Logger from "../../../utils/Logger";
 import { CONFIG } from "../../..";
 
@@ -53,6 +54,7 @@ export default class Ready extends Event {
 
         this.client.guilds.cache.forEach(guild => {
             scheduleJob(rule, getDiscordEventsJob(this.client, guild));
+            scheduleJob(rule, getInternshipOppertunitiesJob(this.client, guild));
         })
 
         Logger.once("setup", "Successfully set up interval sync.")
