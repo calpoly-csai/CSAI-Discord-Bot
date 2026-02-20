@@ -66,12 +66,15 @@ export default class Ready extends Event {
 
         commands.forEach(command => {
             data.push({
-                name: command.name,
-                description: command.description,
-                options: command.options,
-                default_member_permissions: command.default_member_permissions.toString(),
-                dm_permission: command.dm_permission,
-            })
+              name: command.name,
+              description: command.description,
+              options: command.options,
+              default_member_permissions:
+                command.default_member_permissions !== undefined
+                  ? command.default_member_permissions.toString()
+                  : null,
+              dm_permission: command.dm_permission,
+            });
         })
 
         return data;

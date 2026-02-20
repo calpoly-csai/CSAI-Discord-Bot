@@ -4,7 +4,7 @@ import Logger from '../utils/Logger';
 import { CONFIG } from '..';
 import sendInternshipJobSummary from './sendInternshipJobSummary';
 import { exec } from 'child_process';
-import { createReadStream, writeFileSync } from 'fs';
+import { createReadStream, writeFileSync, promises as fsPromises } from 'fs';
 
 // --- Constants ---
 const README_PATH = '../Summer2026-Internships/README.md';
@@ -17,11 +17,12 @@ const NAME = "Fetch Internship Opportunities";
 function gitPullInternshipsRepo(): Promise<string> {
   return new Promise((resolve, reject) => {
     exec(
-      'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
+      //'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
+      'cd ../Summer2026-Internships && git pull origin && cd ../CSAI-Discord-Bot',
       (error, stdout, stderr) => {
         if (error) return reject(error);
         resolve(stdout);
-      }
+      },
     );
   });
 }
@@ -171,38 +172,45 @@ function writeOutputFiles(
 }
 
 // --- Main Function ---
-const getInternshipOppertunitiesJob = (client: DiscordClient, guild: Guild | null) => async () => {
-  try {
+
+const getInternshipOppertunitiesJob =
+  (client: DiscordClient, guild: Guild | null) => async () => {
     const whenDone = (log: string, success: boolean) =>
-        sendInternshipJobSummary(
-            client,
-            CONFIG.discord.logs.channel_id,
-            NAME,
-            log
-        );
+      sendInternshipJobSummary(
+        client,
+        CONFIG.discord.logs.channel_id,
+        NAME,
+        log,
+      );
     const logger = new Logger(NAME, client, whenDone);
 
     logger.start();
-    let success_new = 0;
-    let success_edit = 0;
-    let fail = 0;
 
-    if (!guild) {
-        logger.fail("Failed to fetch guild - guild with provided ID not found?.");
-        return;
-    }
+    try {
+      if (!guild) {
+        logger.fail(
+          'Failed to fetch guild - guild with provided ID not found?.',
+        );
+        // Return a consistent shape so callers can safely use it
+        logger.end();
+        return {
+          cleanedTable: '',
+          companies: [] as {
+            company: string;
+            jobTitle: string;
+            link: string;
+          }[],
+        };
+      }
 
-    const gitOutput = await gitPullInternshipsRepo();
-    logger.info(`Git pull output: ${gitOutput}`);
+      const gitOutput = await gitPullInternshipsRepo();
+      logger.info(`Git pull output: ${gitOutput}`);
 
-    let readmeContent = '';
-    const readStream = createReadStream(README_PATH, { encoding: 'utf8' });
+      // Use fs.promises.readFile so we await completion and can return results
+      const readmeContent = await fsPromises.readFile(README_PATH, {
+        encoding: 'utf8',
+      });
 
-    readStream.on('data', (chunk) => {
-      readmeContent += chunk;
-    });
-
-    readStream.on('end', () => {
       const sectionTable = extractSectionTable(readmeContent);
       const cleanedTable = cleanTableHtml(sectionTable);
       const companies = extractCompanies(cleanedTable);
@@ -210,18 +218,18 @@ const getInternshipOppertunitiesJob = (client: DiscordClient, guild: Guild | nul
       writeOutputFiles(cleanedTable, companies);
       logger.info(`Section content written to ${SECTION_OUTPUT_PATH}`);
       logger.info(`Companies list written to ${COMPANIES_OUTPUT_PATH}`);
-    });
+      logger.info(
+        `Successfully fetched and processed internship opportunities.`,
+      );
+      logger.end();
 
-    readStream.on('error', (error) => {
-      logger.fail(`Error reading README.md: ${error.message}`);
-    });
-
-    logger.info(`Successfully fetched and processed internship opportunities.`);
-    logger.end();
-    
-  } catch (error) {
-    console.log(`Error executing git pull: ${error}`);
-  }
-}
+      return { cleanedTable, companies };
+    } catch (error: any) {
+      logger.fail(`Error executing job: ${error?.message ?? error}`);
+      logger.end();
+      // rethrow so callers can handle the error
+      throw error;
+    }
+};
 
 export default getInternshipOppertunitiesJob;
