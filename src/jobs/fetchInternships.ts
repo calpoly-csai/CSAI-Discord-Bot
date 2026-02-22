@@ -1,4 +1,8 @@
-import { Guild, GuildScheduledEventEntityType, GuildScheduledEventPrivacyLevel } from "discord.js";
+import {
+  Guild,
+  GuildScheduledEventEntityType,
+  GuildScheduledEventPrivacyLevel,
+} from 'discord.js';
 import DiscordClient from '../discord/classes/DiscordClient';
 import Logger from '../utils/Logger';
 import { CONFIG } from '..';
@@ -10,8 +14,17 @@ import { createReadStream, writeFileSync, promises as fsPromises } from 'fs';
 const README_PATH = '../Summer2026-Internships/README.md';
 const SECTION_OUTPUT_PATH = '../Summer2026-Internships/section_output.md';
 const COMPANIES_OUTPUT_PATH = '../Summer2026-Internships/companies_output.md';
-const SECTION_HEADER = '## 🤖 Data Science, AI & Machine Learning Internship Roles';
-const NAME = "Fetch Internship Opportunities";
+let SECTION_HEADERS = ['## 🤖 Data Science, AI & Machine Learning Internship Roles'];
+const NAME = 'Fetch Internship Opportunities';
+
+const SECTIONS = [
+  { name: 'SWE', value: '## 💻 Software Engineering Internship Roles' },
+  { name: 'AI', value: '## 🤖 Data Science, AI & Machine Learning Internship Roles'},
+  { name: 'PM', value: '## 📱 Product Management Internship Roles' },
+  { name: 'QUANT', value: '## 📈 Quantitative Finance Internship Roles' },
+  { name: 'HWE', value: '## 🔧 Hardware Engineering Internship Roles' },
+  { name: 'ALL', value: '## All (Will take longer)' },
+];
 
 // --- Utility Functions ---
 function gitPullInternshipsRepo(): Promise<string> {
@@ -19,30 +32,30 @@ function gitPullInternshipsRepo(): Promise<string> {
     exec(
       'cd ../Summer2026-Internships && git pull origin && cd ../CSAI-Discord-Bot',
       (error, stdout, stderr) => {
-      if (error) {
-        // Try the alternative command if the first one fails
-        exec(
-        'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
-        (altError, altStdout, altStderr) => {
-          if (altError) return reject(altError);
-          resolve(altStdout);
-        },
-        );
-      } else {
-        resolve(stdout);
-      }
+        if (error) {
+          // Try the alternative command if the first one fails
+          exec(
+            'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
+            (altError, altStdout, altStderr) => {
+              if (altError) return reject(altError);
+              resolve(altStdout);
+            },
+          );
+        } else {
+          resolve(stdout);
+        }
       },
     );
   });
 }
 
-function extractSectionTable(readmeContent: string): string {
+function extractSectionTable(readmeContent: string, sectionHeader: string): string {
   const lines = readmeContent.split('\n');
   let sectionStarted = false;
   let sectionContent = '';
 
   for (const line of lines) {
-    if (line.trim() === SECTION_HEADER) {
+    if (line.trim() === sectionHeader) {
       sectionStarted = true;
       continue;
     }
@@ -87,7 +100,7 @@ function cleanTableHtml(tableHtml: string): string {
         return trStart + tdMatches.map((m) => m[0]).join('') + trEnd;
       }
       return match;
-    }
+    },
   );
 
   // Clean up links and images in table rows
@@ -101,7 +114,7 @@ function cleanTableHtml(tableHtml: string): string {
         /<a[^>]*>[\s\S]*?<\/a>/gi,
         (aMatch) => {
           return aMatch.replace(/<a[^>]*>([\s\S]*?)<\/a>/i, '$1');
-        }
+        },
       );
     }
     // For last column, keep only first link
@@ -117,7 +130,7 @@ function cleanTableHtml(tableHtml: string): string {
           return offset === allLinks[0].index ? allLinks[0][0] : '';
         }
         return match;
-      }
+      },
     );
 
     // Fix image src and width
@@ -125,7 +138,7 @@ function cleanTableHtml(tableHtml: string): string {
       td[0] = td[0]
         .replace(
           /src="https:\/\/i\.imgur\.com\/fbjwDvo\.png"/gi,
-          'src="https://i.imgur.com/6cFAMUo.png"'
+          'src="https://i.imgur.com/6cFAMUo.png"',
         )
         .replace(/width="50"/gi, 'width="80"');
     });
@@ -139,7 +152,7 @@ function cleanTableHtml(tableHtml: string): string {
 }
 
 function extractCompanies(
-  tableHtml: string
+  tableHtml: string,
 ): { company: string; jobTitle: string; link: string }[] {
   const companies: { company: string; jobTitle: string; link: string }[] = [];
   const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
@@ -154,13 +167,13 @@ function extractCompanies(
     jobTitle = jobTitle
       .replace(
         /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
-        ''
+        '',
       )
       .trim();
     if (/phd|doctor of philosophy/i.test(jobTitle)) continue;
 
     const linkMatch = tdMatches[tdMatches.length - 1][1].match(
-      /<a[^>]*href="([^"]+)"[^>]*>/i
+      /<a[^>]*href="([^"]+)"[^>]*>/i,
     );
     const link = linkMatch ? linkMatch[1] : '';
 
@@ -171,11 +184,11 @@ function extractCompanies(
 
 function writeOutputFiles(
   tableHtml: string,
-  companies: { company: string; jobTitle: string; link: string }[]
+  companies: { company: string; jobTitle: string; link: string }[],
 ) {
   writeFileSync(SECTION_OUTPUT_PATH, tableHtml.trim(), { encoding: 'utf8' });
   const companiesOutput = companies
-    .map(({ company, jobTitle, link }) => `${company}: [${jobTitle}](${link})`)
+    .map(({ company, jobTitle, link }) => `${company}: [${jobTitle}](<${link}>)`)
     .join('\n');
   writeFileSync(COMPANIES_OUTPUT_PATH, companiesOutput, { encoding: 'utf8' });
 }
@@ -183,7 +196,7 @@ function writeOutputFiles(
 // --- Main Function ---
 
 const getInternshipOppertunitiesJob =
-  (client: DiscordClient, guild: Guild | null) => async () => {
+  (client: DiscordClient, guild: Guild | null) => async (section: string) => {
     const whenDone = (log: string, success: boolean) =>
       sendInternshipJobSummary(
         client,
@@ -194,6 +207,31 @@ const getInternshipOppertunitiesJob =
     const logger = new Logger(NAME, client, whenDone);
 
     logger.start();
+
+    if (section) {
+      const matchedSection = SECTIONS.find(
+        (s) => s.name.toLowerCase() === section.toLowerCase(),
+      );
+      if (matchedSection) {
+        if (matchedSection.name === 'ALL') {
+          logger.info(
+            `Category "ALL" selected. Fetching all internships (this may take longer).`,
+          );
+          SECTION_HEADERS = SECTIONS.filter((s) => s.name !== 'ALL').map((s) => s.value);
+        } else {
+          SECTION_HEADERS = [matchedSection.value];
+          logger.info(`Category "${matchedSection.name}" selected. Fetching relevant internships.`);
+        }
+      } else {
+        logger.warn(
+          `Invalid category "${section}" provided. Defaulting to "${SECTION_HEADERS}".`,
+        );
+      }
+    } else {
+      logger.info(
+        `No category provided. Defaulting to "${SECTION_HEADERS}".`,
+      );
+    }
 
     try {
       if (!guild) {
@@ -220,11 +258,18 @@ const getInternshipOppertunitiesJob =
         encoding: 'utf8',
       });
 
-      const sectionTable = extractSectionTable(readmeContent);
-      const cleanedTable = cleanTableHtml(sectionTable);
-      const companies = extractCompanies(cleanedTable);
+      let allCompanies: { company: string; jobTitle: string; link: string }[] = [];
+      let fullCleanedTable = '';
+      for (const sectionHeader of SECTION_HEADERS) {
+        logger.info(`Processing section: ${sectionHeader}`);
+        const sectionTable = extractSectionTable(readmeContent, sectionHeader);
+        const cleanedTable = cleanTableHtml(sectionTable);
+        const companies = extractCompanies(cleanedTable);
+        fullCleanedTable += cleanedTable + '\n';
+        allCompanies = allCompanies.concat(companies);
+      }
 
-      writeOutputFiles(cleanedTable, companies);
+      writeOutputFiles(fullCleanedTable, allCompanies);
       logger.info(`Section content written to ${SECTION_OUTPUT_PATH}`);
       logger.info(`Companies list written to ${COMPANIES_OUTPUT_PATH}`);
       logger.info(
@@ -232,13 +277,13 @@ const getInternshipOppertunitiesJob =
       );
       logger.end();
 
-      return { cleanedTable, companies };
+      return { cleanedTable: fullCleanedTable, companies: allCompanies };
     } catch (error: any) {
       logger.fail(`Error executing job: ${error?.message ?? error}`);
       logger.end();
       // rethrow so callers can handle the error
       throw error;
     }
-};
+  };
 
 export default getInternshipOppertunitiesJob;
