@@ -34,9 +34,11 @@ export default class Test extends Command {
         .join('\n');
       const sectionText = result.cleanedTable;
 
-      if (companiesText.length < 1900 && sectionText.length < 1900) {
+      /* removed && sectionText.length < 1900 from the if and \n\n**Table:**\n${sectionText} from content 
+      for reasons explain in lower comment*/
+      if (companiesText.length < 1900) {
         await interaction.followUp({
-          content: `**Companies:**\n${companiesText}\n\n**Table:**\n${sectionText}`,
+          content: `**Here are todays internships:**\n${companiesText}`,
         });
       } else {
         await interaction.followUp({
@@ -47,6 +49,7 @@ export default class Test extends Command {
             },
           ],
         });
+        /* Not needed since the companies output is just the clean version of the section table, so we can just share that one file instead of both
         await interaction.followUp({
           files: [
             {
@@ -54,7 +57,7 @@ export default class Test extends Command {
               name: 'section_output.md',
             },
           ],
-        });
+        })*/
       }
     } catch (err: Error | any) {
       if (err instanceof Error) {

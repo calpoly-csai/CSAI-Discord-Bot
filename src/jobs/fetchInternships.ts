@@ -17,11 +17,20 @@ const NAME = "Fetch Internship Opportunities";
 function gitPullInternshipsRepo(): Promise<string> {
   return new Promise((resolve, reject) => {
     exec(
-      //'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
       'cd ../Summer2026-Internships && git pull origin && cd ../CSAI-Discord-Bot',
       (error, stdout, stderr) => {
-        if (error) return reject(error);
+      if (error) {
+        // Try the alternative command if the first one fails
+        exec(
+        'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
+        (altError, altStdout, altStderr) => {
+          if (altError) return reject(altError);
+          resolve(altStdout);
+        },
+        );
+      } else {
         resolve(stdout);
+      }
       },
     );
   });
