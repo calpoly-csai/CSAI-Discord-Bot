@@ -43,17 +43,19 @@ ${log}`
     let roles = status == "SUCCESS" ? CONFIG.discord.logs.success_roles : CONFIG.discord.logs.error_roles;
 
     console.log("------ sending final msg")
-    client.sendMessage(
-        channelId,
+    client.sendMessage(channelId, {
+      content:
+        (roles && roles.length > 0
+          ? roles.map((role) => `<@&${role}>`).join(' ')
+          : '') + `${status == 'SUCCESS' ? '✅' : '❌'}`,
+      embeds: [
         {
-            content: roles.map(role => `<@&${role}>`).join(" ") + `${status == "SUCCESS" ? "✅" : "❌"}`,
-            embeds: [{
-                title: `Report for ${situationName}`,
-                description: message,
-                fields: []
-            }]
+          title: `Report for ${situationName}`,
+          description: message,
+          fields: [],
         },
-    );
+      ],
+    });
     Logger.once("Send Discord Log Message", "sent message:\n" + message);
 }
 
