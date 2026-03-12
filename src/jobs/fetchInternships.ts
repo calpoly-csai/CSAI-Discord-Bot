@@ -35,8 +35,7 @@ function gitPullInternshipsRepo(): Promise<string> {
         if (error) {
           // Try the alternative command if the first one fails
           exec(
-            //'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
-            'cd ../Summer2026-Internships && git pull origin && cd ../CSAI-Discord-Bot',
+            'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
             (altError, altStdout, altStderr) => {
               if (altError) return reject(altError);
               resolve(altStdout);
