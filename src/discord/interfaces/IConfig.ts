@@ -4,6 +4,7 @@ export interface IConfig {
     },
     discord: {
         server_id: string,
+        board_role_id: string,
         auto_reaction_channel_ids: string[],
         logs: {
             channel_id: string;

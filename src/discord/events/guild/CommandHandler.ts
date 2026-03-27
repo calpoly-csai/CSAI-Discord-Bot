@@ -1,6 +1,7 @@
-import { ChatInputCommandInteraction, Collection, EmbedBuilder, Events } from "discord.js";
+import { ChatInputCommandInteraction, Collection, EmbedBuilder, Events, GuildMember } from "discord.js";
 import DiscordClient from "../../classes/DiscordClient";
 import Event from "../../classes/Event";
+import { CONFIG } from "../../..";
 
 export default class CommandHandler extends Event {
 
@@ -22,6 +23,20 @@ export default class CommandHandler extends Event {
             // delete inapplicable command
             this.client.commands.delete(interaction.commandName);
             return interaction.reply({ content: "Command not found.", ephemeral: true });
+        }
+
+        if (["sync", "test"].includes(interaction.commandName)) {
+            const member = interaction.member;
+            const hasBoardRole = member instanceof GuildMember
+                ? member.roles.cache.has(CONFIG.discord.board_role_id)
+                : false;
+
+            if (!hasBoardRole) {
+                return interaction.reply({
+                    content: "You do not have permission to use this command.",
+                    ephemeral: true,
+                });
+            }
         }
 
         const { cooldowns } = this.client;

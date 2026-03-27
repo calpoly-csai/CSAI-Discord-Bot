@@ -1,52 +1,35 @@
-import {
-  Guild,
-  GuildScheduledEventEntityType,
-  GuildScheduledEventPrivacyLevel,
-} from 'discord.js';
 import DiscordClient from '../discord/classes/DiscordClient';
 import Logger from '../utils/Logger';
 import { CONFIG } from '..';
 import sendInternshipJobSummary from './sendInternshipJobSummary';
 import { exec } from 'child_process';
-import { createReadStream, writeFileSync, promises as fsPromises } from 'fs';
+import { writeFileSync, promises as fsPromises } from 'fs';
+import path from 'path';
+import { promisify } from 'util';
+import {
+  INTERNSHIP_SECTIONS,
+  InternshipPosting,
+  InternshipStore,
+  createEmptyInternshipStore,
+  getInternshipStore,
+  updateInternshipStore,
+} from './internshipStore';
 
 // --- Constants ---
-const README_PATH = '../Summer2026-Internships/README.md';
-const SECTION_OUTPUT_PATH = '../Summer2026-Internships/section_output.md';
-const COMPANIES_OUTPUT_PATH = '../Summer2026-Internships/companies_output.md';
-let SECTION_HEADERS = ['## 🤖 Data Science, AI & Machine Learning Internship Roles'];
+const execAsync = promisify(exec);
+const INTERNSHIPS_REPO_PATH = path.resolve(process.cwd(), '../Summer2026-Internships');
+const README_PATH = path.join(INTERNSHIPS_REPO_PATH, 'README.md');
+const SECTION_OUTPUT_PATH = path.join(INTERNSHIPS_REPO_PATH, 'section_output.md');
+const COMPANIES_OUTPUT_PATH = path.join(INTERNSHIPS_REPO_PATH, 'companies_output.md');
 const NAME = 'Fetch Internship Opportunities';
 
-const SECTIONS = [
-  { name: 'SWE', value: '## 💻 Software Engineering Internship Roles' },
-  { name: 'AI', value: '## 🤖 Data Science, AI & Machine Learning Internship Roles'},
-  { name: 'PM', value: '## 📱 Product Management Internship Roles' },
-  { name: 'QUANT', value: '## 📈 Quantitative Finance Internship Roles' },
-  { name: 'HWE', value: '## 🔧 Hardware Engineering Internship Roles' },
-  { name: 'ALL', value: '## All (Will take longer)' },
-];
-
 // --- Utility Functions ---
-function gitPullInternshipsRepo(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(
-      'cd ../Summer2026-Internships && git pull origin && cd ../CSAI-Discord-Bot',
-      (error, stdout, stderr) => {
-        if (error) {
-          // Try the alternative command if the first one fails
-          exec(
-            'cd ../Summer2026-Internships && git pull origin && cd ../glassic-bot',
-            (altError, altStdout, altStderr) => {
-              if (altError) return reject(altError);
-              resolve(altStdout);
-            },
-          );
-        } else {
-          resolve(stdout);
-        }
-      },
-    );
-  });
+async function gitPullInternshipsRepo(): Promise<string> {
+  const { stdout, stderr } = await execAsync(
+    `git -C "${INTERNSHIPS_REPO_PATH}" pull origin`,
+  );
+
+  return stderr ? `${stdout}\n${stderr}`.trim() : stdout.trim();
 }
 
 function extractSectionTable(readmeContent: string, sectionHeader: string): string {
@@ -151,10 +134,8 @@ function cleanTableHtml(tableHtml: string): string {
   return modified;
 }
 
-function extractCompanies(
-  tableHtml: string,
-): { company: string; jobTitle: string; link: string }[] {
-  const companies: { company: string; jobTitle: string; link: string }[] = [];
+function extractCompanies(tableHtml: string): InternshipPosting[] {
+  const companies: InternshipPosting[] = [];
   const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   let match;
   while ((match = rowRegex.exec(tableHtml)) !== null) {
@@ -184,7 +165,7 @@ function extractCompanies(
 
 function writeOutputFiles(
   tableHtml: string,
-  companies: { company: string; jobTitle: string; link: string }[],
+  companies: InternshipPosting[],
 ) {
   writeFileSync(SECTION_OUTPUT_PATH, tableHtml.trim(), { encoding: 'utf8' });
   const companiesOutput = companies
@@ -193,10 +174,29 @@ function writeOutputFiles(
   writeFileSync(COMPANIES_OUTPUT_PATH, companiesOutput, { encoding: 'utf8' });
 }
 
+function buildInternshipStore(readmeContent: string): {
+  store: InternshipStore;
+  cleanedTable: string;
+} {
+  const store = createEmptyInternshipStore(INTERNSHIPS_REPO_PATH, README_PATH);
+  let fullCleanedTable = '';
+
+  for (const section of INTERNSHIP_SECTIONS) {
+    const sectionTable = extractSectionTable(readmeContent, section.header);
+    const cleanedTable = cleanTableHtml(sectionTable);
+    store.internshipsByType[section.name] = extractCompanies(cleanedTable);
+    fullCleanedTable += `${cleanedTable}\n`;
+  }
+
+  store.lastUpdatedAt = new Date().toISOString();
+
+  return { store, cleanedTable: fullCleanedTable };
+}
+
 // --- Main Function ---
 
 const getInternshipOppertunitiesJob =
-  (client: DiscordClient, guild: Guild | null) => async (section: string) => {
+  (client: DiscordClient) => async () => {
     const whenDone = (log: string, success: boolean) =>
       sendInternshipJobSummary(
         client,
@@ -208,79 +208,39 @@ const getInternshipOppertunitiesJob =
 
     logger.start();
 
-    if (section) {
-      const matchedSection = SECTIONS.find(
-        (s) => s.name.toLowerCase() === section.toLowerCase(),
-      );
-      if (matchedSection) {
-        if (matchedSection.name === 'ALL') {
-          logger.info(
-            `Category "ALL" selected. Fetching all internships (this may take longer).`,
-          );
-          SECTION_HEADERS = SECTIONS.filter((s) => s.name !== 'ALL').map((s) => s.value);
-        } else {
-          SECTION_HEADERS = [matchedSection.value];
-          logger.info(`Category "${matchedSection.name}" selected. Fetching relevant internships.`);
-        }
-      } else {
-        logger.warn(
-          `Invalid category "${section}" provided. Defaulting to "${SECTION_HEADERS}".`,
-        );
-      }
-    } else {
-      logger.info(
-        `No category provided. Defaulting to "${SECTION_HEADERS}".`,
-      );
-    }
-
     try {
-      if (!guild) {
-        logger.fail(
-          'Failed to fetch guild - guild with provided ID not found?.',
-        );
-        // Return a consistent shape so callers can safely use it
-        logger.end();
-        return {
-          cleanedTable: '',
-          companies: [] as {
-            company: string;
-            jobTitle: string;
-            link: string;
-          }[],
-        };
-      }
-
       const gitOutput = await gitPullInternshipsRepo();
       logger.info(`Git pull output: ${gitOutput}`);
 
-      // Use fs.promises.readFile so we await completion and can return results
       const readmeContent = await fsPromises.readFile(README_PATH, {
         encoding: 'utf8',
       });
+      const { store, cleanedTable } = buildInternshipStore(readmeContent);
 
-      let allCompanies: { company: string; jobTitle: string; link: string }[] = [];
-      let fullCleanedTable = '';
-      for (const sectionHeader of SECTION_HEADERS) {
-        logger.info(`Processing section: ${sectionHeader}`);
-        const sectionTable = extractSectionTable(readmeContent, sectionHeader);
-        const cleanedTable = cleanTableHtml(sectionTable);
-        const companies = extractCompanies(cleanedTable);
-        fullCleanedTable += cleanedTable + '\n';
-        allCompanies = allCompanies.concat(companies);
+      for (const section of INTERNSHIP_SECTIONS) {
+        logger.info(
+          `Processed ${section.name}: ${store.internshipsByType[section.name].length} internships.`,
+        );
       }
 
-      writeOutputFiles(fullCleanedTable, allCompanies);
+      writeOutputFiles(
+        cleanedTable,
+        INTERNSHIP_SECTIONS.flatMap((section) => store.internshipsByType[section.name]),
+      );
       logger.info(`Section content written to ${SECTION_OUTPUT_PATH}`);
       logger.info(`Companies list written to ${COMPANIES_OUTPUT_PATH}`);
+      const updatedStore = updateInternshipStore(store);
+      logger.info(
+        `Updated internship store at ${updatedStore.lastUpdatedAt} with ${INTERNSHIP_SECTIONS.flatMap((section) => updatedStore.internshipsByType[section.name]).length} internships.`,
+      );
       logger.info(
         `Successfully fetched and processed internship opportunities.`,
       );
       logger.end();
 
-      return { cleanedTable: fullCleanedTable, companies: allCompanies };
+      return getInternshipStore();
     } catch (error: any) {
       logger.fail(`Error executing job: ${error?.message ?? error}`);
-      logger.end();
       // rethrow so callers can handle the error
       throw error;
     }

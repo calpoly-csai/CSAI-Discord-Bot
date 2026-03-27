@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType, PermissionFlagsBits } from "discord.js";
+import { ApplicationCommandOptionType } from "discord.js";
 import Category from "../enums/Category";
 import DiscordClient from "../classes/DiscordClient";
 import Command from "../classes/Command";
@@ -12,7 +12,7 @@ export default class Sync extends Command{
                 name: "sync",
                 description: "Manually trigger an events sync from Notion to either Discord or GCal.",
                 category: Category.Utilities,
-                default_member_permissions: PermissionFlagsBits.UseApplicationCommands,
+                default_member_permissions: BigInt(0),
                 dm_permission: true,
                 cooldown: 3,
                 options: [

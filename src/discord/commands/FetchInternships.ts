@@ -1,13 +1,36 @@
 import {
   ApplicationCommandOptionType,
-  CacheType,
   ChatInputCommandInteraction,
   PermissionFlagsBits,
 } from 'discord.js';
-import getInternshipOppertunitiesJob from '../../jobs/fetchInternships';
 import Command from '../classes/Command';
 import DiscordClient from '../classes/DiscordClient';
 import Category from '../enums/Category';
+import {
+  InternshipRequestType,
+  getInternshipsForCategory,
+  getInternshipStore,
+} from '../../jobs/internshipStore';
+import { buildInternshipMessagesWithTitle } from '../../utils/formatInternshipsForDiscord';
+
+function getCategoryLabel(category: InternshipRequestType): string {
+  switch (category) {
+    case 'SWE':
+      return 'Software Engineering';
+    case 'AI':
+      return 'AI / Data Science / Machine Learning';
+    case 'PM':
+      return 'Product Management';
+    case 'QUANT':
+      return 'Quantitative Finance';
+    case 'HWE':
+      return 'Hardware Engineering';
+    case 'ALL':
+      return 'All internship categories';
+    default:
+      return category;
+  }
+}
 
 export default class Test extends Command {
   constructor(client: DiscordClient) {
@@ -38,47 +61,45 @@ export default class Test extends Command {
   }
 
   async Execute(interaction: ChatInputCommandInteraction) {
-    const category = interaction.options.getString('category', true);
+    const category = interaction.options.getString('category', true) as InternshipRequestType;
     await interaction.deferReply({ ephemeral: true });
     try {
-      const result = await getInternshipOppertunitiesJob(
-        this.client,
-        interaction.guild ?? null,
-      )(category);
-      const companiesText = result.companies
-        .map((c) => `${c.company}: [${c.jobTitle}](<${c.link}>)`)
-        .join('\n');
-      if (companiesText.length === 0) {
+      const store = getInternshipStore();
+
+      if (!store.lastUpdatedAt) {
         await interaction.followUp({
-          content: `No new ${category} internships were posted on our DB today.`,
+          content: 'No internships have been posted yet.',
+          ephemeral: true,
         });
         return;
       }
-      const sectionText = result.cleanedTable;
 
-      /* removed && sectionText.length < 1900 from the if and \n\n**Table:**\n${sectionText} from content 
-      for reasons explain in lower comment*/
-      if (companiesText.length < 1900) {
+      const postings = getInternshipsForCategory(category, store);
+      if (postings.length === 0) {
         await interaction.followUp({
-          content: `**Here are todays internships:**\n${companiesText}`,
+          content: `No ${category} internships were posted today.`,
+          ephemeral: true,
         });
-      } else {
-        const chunks = companiesText.match(/[\s\S]{1,1900}(?=\n|$)/g); // Split into chunks of max 1900 characters, breaking at newlines
-        if (chunks) {
-          await interaction.followUp({ content: `**Here are todays internships:**` });
-          for (const chunk of chunks) {
-            await interaction.followUp({ content: chunk });
-          }
-        }
+        return;
+      }
+
+      const categoryLabel = getCategoryLabel(category);
+      const title = `<@${interaction.user.id}> **Today's ${categoryLabel} internships (${postings.length} posted):**`;
+      const messages = buildInternshipMessagesWithTitle(postings, title);
+
+      for (const message of messages) {
+        await interaction.followUp({ content: message, ephemeral: true });
       }
     } catch (err: Error | any) {
       if (err instanceof Error) {
         await interaction.followUp({
           content: `Error fetching internships: ${err.message}`,
+          ephemeral: true,
         });
       } else {
         await interaction.followUp({
           content: `Error fetching internships: ${err}`,
+          ephemeral: true,
         });
       }
     }

@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType, CacheType, ChatInputCommandInteraction, PermissionFlagsBits } from "discord.js";
+import { ApplicationCommandOptionType, CacheType, ChatInputCommandInteraction } from "discord.js";
 import Command from "../classes/Command";
 import DiscordClient from "../classes/DiscordClient";
 import Category from "../enums/Category";
@@ -12,7 +12,7 @@ export default class Test extends Command {
                 description: "Test command.",
                 category: Category.Utilities,
                 options: {},
-                default_member_permissions: PermissionFlagsBits.UseApplicationCommands,
+                default_member_permissions: BigInt(0),
                 dm_permission: true,
                 cooldown: 3,
             }
