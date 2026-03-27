@@ -51,8 +51,8 @@ export default class Ready extends Event {
      */
     private setupSync = () => {
         const rule = new RecurrenceRule();
-        rule.hour = 23;
-        rule.minute = 23;
+        rule.hour = 8;
+        rule.minute = 15;
         rule.tz = "America/Los_Angeles";
 
         this.client.guilds.cache.forEach(guild => {
