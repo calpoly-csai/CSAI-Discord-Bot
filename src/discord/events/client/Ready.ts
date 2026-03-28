@@ -4,8 +4,12 @@ import Event from "../../classes/Event";
 import Command from "../../classes/Command";
 import { RecurrenceRule, scheduleJob } from "node-schedule";
 import getDiscordEventsJob from "../../../jobs/syncDiscordEventsJob";
+import getInternshipOppertunitiesJob from "../../../jobs/fetchInternships";
 import Logger from "../../../utils/Logger";
 import { CONFIG } from "../../..";
+import { buildInternshipMessagesWithTitle } from "../../../utils/formatInternshipsForDiscord";
+import { selectHighlightedInternships } from "../../../jobs/selectHighlightedInternships";
+import { getInternshipsForCategory } from "../../../jobs/internshipStore";
 
 export default class Ready extends Event {
     constructor(client: DiscordClient) {
@@ -47,13 +51,49 @@ export default class Ready extends Event {
      */
     private setupSync = () => {
         const rule = new RecurrenceRule();
-        rule.minute = 15;
         rule.hour = 8;
+        rule.minute = 15;
         rule.tz = "America/Los_Angeles";
 
         this.client.guilds.cache.forEach(guild => {
             scheduleJob(rule, getDiscordEventsJob(this.client, guild));
         })
+
+        scheduleJob(rule, async () => {
+            try {
+                const store = await getInternshipOppertunitiesJob(this.client)();
+                const allInternships = getInternshipsForCategory("ALL", store);
+                const highlightedInternships = await selectHighlightedInternships(this.client, store);
+                const outroMessage = `**${allInternships.length}** internships were posted today.\nUse \`/fetchinternships\` with a category to see the rest.`;
+                const messages = buildInternshipMessagesWithTitle(
+                    highlightedInternships,
+                    `**Today's highlighted internships:**`
+                );
+
+                if (allInternships.length === 0) {
+                    return;
+                }
+
+                for (const guild of this.client.guilds.cache.values()) {
+                    const targetChannel = guild.channels.cache.find(
+                        (channel) => channel.name === "opportunities-test" && channel.isTextBased()
+                    );
+
+                    if (!targetChannel || !targetChannel.isTextBased()) {
+                        console.error("Target channel not found or is not text-based.");
+                        continue;
+                    }
+
+                    for (const message of messages) {
+                        await (targetChannel as TextChannel).send(message);
+                    }
+
+                    await (targetChannel as TextChannel).send(outroMessage);
+                }
+            } catch (error) {
+                console.error("Error executing internship job:", error);
+            }
+        });
 
         Logger.once("setup", "Successfully set up interval sync.")
     }
@@ -64,12 +104,15 @@ export default class Ready extends Event {
 
         commands.forEach(command => {
             data.push({
-                name: command.name,
-                description: command.description,
-                options: command.options,
-                default_member_permissions: command.default_member_permissions.toString(),
-                dm_permission: command.dm_permission,
-            })
+              name: command.name,
+              description: command.description,
+              options: command.options,
+              default_member_permissions:
+                command.default_member_permissions !== undefined
+                  ? command.default_member_permissions.toString()
+                  : null,
+              dm_permission: command.dm_permission,
+            });
         })
 
         return data;
