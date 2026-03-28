@@ -26,6 +26,11 @@ export default class Sync extends Command{
                         description: "sync events with Google Calendar",
                         type: ApplicationCommandOptionType.Subcommand
                     },
+                    {
+                        name: "internships",
+                        description: "pull and check for newly posted internships",
+                        type: ApplicationCommandOptionType.Subcommand
+                    },
                 ]
     
             }
