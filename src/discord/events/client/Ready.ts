@@ -74,9 +74,14 @@ export default class Ready extends Event {
                     return;
                 }
 
+                if (!CONFIG.discord.internships.channel_id) {
+                    console.error("Internship channel id is missing.");
+                    return;
+                }
+
                 for (const guild of this.client.guilds.cache.values()) {
                     const targetChannel = guild.channels.cache.find(
-                        (channel) => channel.name === "opportunities-test" && channel.isTextBased()
+                        (channel) => channel.id === CONFIG.discord.internships.channel_id && channel.isTextBased()
                     );
 
                     if (!targetChannel || !targetChannel.isTextBased()) {

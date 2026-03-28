@@ -6,6 +6,9 @@ export interface IConfig {
         server_id: string,
         board_role_id: string,
         auto_reaction_channel_ids: string[],
+        internships: {
+            channel_id: string;
+        },
         logs: {
             channel_id: string;
             success_roles: string[];
