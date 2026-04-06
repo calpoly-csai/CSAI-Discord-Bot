@@ -32,6 +32,21 @@ async function gitPullInternshipsRepo(): Promise<string> {
   return stderr ? `${stdout}\n${stderr}`.trim() : stdout.trim();
 }
 
+function isOlderThanTodayAgeRow(line: string): boolean {
+  const ageMatch = line.match(/<td>\s*([^<]+)\s*<\/td>\s*$/i);
+  if (!ageMatch) {
+    return false;
+  }
+
+  const age = ageMatch[1].trim().toLowerCase();
+
+  if (age === '0d') {
+    return false;
+  }
+
+  return /^\d+\s*[a-z]+$/.test(age);
+}
+
 function extractSectionTable(readmeContent: string, sectionHeader: string): string {
   const lines = readmeContent.split('\n');
   let sectionStarted = false;
@@ -51,7 +66,7 @@ function extractSectionTable(readmeContent: string, sectionHeader: string): stri
       continue;
     }
     if (sectionStarted && sectionContent) {
-      if (line.endsWith('<td>1d</td>')) break;
+      if (isOlderThanTodayAgeRow(line)) break;
       sectionContent += line + '\n';
     }
   }
