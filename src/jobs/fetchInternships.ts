@@ -17,7 +17,7 @@ import {
 
 // --- Constants ---
 const execAsync = promisify(exec);
-const INTERNSHIPS_REPO_PATH = path.resolve(process.cwd(), '../Summer2026-Internships');
+const INTERNSHIPS_REPO_PATH = path.resolve(process.cwd(), '../Summer2027-Internships');
 const README_PATH = path.join(INTERNSHIPS_REPO_PATH, 'README.md');
 const SECTION_OUTPUT_PATH = path.join(INTERNSHIPS_REPO_PATH, 'section_output.md');
 const COMPANIES_OUTPUT_PATH = path.join(INTERNSHIPS_REPO_PATH, 'companies_output.md');

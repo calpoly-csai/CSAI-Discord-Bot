@@ -25,7 +25,7 @@ Important areas:
 
 External dependency:
 
-- `../Summer2026-Internships`
+- `../Summer2027-Internships`
   Separate repo whose `README.md` is currently parsed for internship data.
 
 ## Required Internship Architecture
@@ -90,7 +90,7 @@ The internship flow should work like this:
 - Prefer a shared formatter/helper for Discord output so command and scheduled posting stay consistent.
 - Avoid duplicating category mapping logic across files.
 - Preserve logging and error reporting unless intentionally refactoring them.
-- Be careful with relative paths like `../Summer2026-Internships`; verify them from the bot root before changing them.
+- Be careful with relative paths like `../Summer2027-Internships`; verify them from the bot root before changing them.
 
 ## Safe Refactor Order
 
