@@ -84,11 +84,11 @@ Do not run a second copy of the bot in `screen`, `tmux`, or a standalone `node` 
 
 ## Log rotation
 
-PM2 writes application stdout and stderr logs under `~/.pm2/logs`. Install the PM2 log rotation module and retain one week of compressed logs:
+PM2 writes application stdout and stderr logs under `~/.pm2/logs`. Install the PM2 log rotation module and retain 14 days of compressed logs:
 
 ```bash
 pm2 install pm2-logrotate
-pm2 set pm2-logrotate:retain 7
+pm2 set pm2-logrotate:retain 14
 pm2 set pm2-logrotate:max_size 10M
 pm2 set pm2-logrotate:compress true
 pm2 set pm2-logrotate:workerInterval 3600
