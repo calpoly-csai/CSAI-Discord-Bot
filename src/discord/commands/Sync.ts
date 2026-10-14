@@ -31,6 +31,11 @@ export default class Sync extends Command{
                         description: "pull and check for newly posted internships",
                         type: ApplicationCommandOptionType.Subcommand
                     },
+                    {
+                        name: "newgrads",
+                        description: "pull and check for newly posted new grad roles",
+                        type: ApplicationCommandOptionType.Subcommand
+                    },
                 ]
     
             }

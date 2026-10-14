@@ -1,11 +1,11 @@
+import {
+  OpportunityPosting,
+  OpportunitySection,
+} from './opportunityParser';
+
 export type InternshipType = 'SWE' | 'AI' | 'PM' | 'QUANT' | 'HWE';
 export type InternshipRequestType = InternshipType | 'ALL';
-
-export type InternshipPosting = {
-  company: string;
-  jobTitle: string;
-  link: string;
-};
+export type InternshipPosting = OpportunityPosting;
 
 export type InternshipStore = {
   lastUpdatedAt: string | null;
@@ -14,7 +14,7 @@ export type InternshipStore = {
   internshipsByType: Record<InternshipType, InternshipPosting[]>;
 };
 
-export const INTERNSHIP_SECTIONS: { name: InternshipType; header: string }[] = [
+export const INTERNSHIP_SECTIONS: OpportunitySection<InternshipType>[] = [
   { name: 'SWE', header: '## 💻 Software Engineering Internship Roles' },
   { name: 'AI', header: '## 🤖 Data Science, AI & Machine Learning Internship Roles' },
   { name: 'PM', header: '## 📱 Product Management Internship Roles' },

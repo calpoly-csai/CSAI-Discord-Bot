@@ -1,15 +1,21 @@
-import { Collection, Events, REST, Routes, TextChannel } from "discord.js";
+import { Collection, Events, Message, REST, Routes, TextChannel } from "discord.js";
 import DiscordClient from "../../classes/DiscordClient";
 import Event from "../../classes/Event";
 import Command from "../../classes/Command";
 import { RecurrenceRule, scheduleJob } from "node-schedule";
 import getDiscordEventsJob from "../../../jobs/syncDiscordEventsJob";
 import getInternshipOppertunitiesJob from "../../../jobs/fetchInternships";
+import getNewGradOpportunitiesJob from "../../../jobs/fetchNewGrads";
 import Logger from "../../../utils/Logger";
 import { CONFIG } from "../../..";
 import { buildInternshipMessagesWithTitle } from "../../../utils/formatInternshipsForDiscord";
+import { buildOpportunityMessagesWithTitle } from "../../../utils/formatOpportunitiesForDiscord";
 import { selectHighlightedInternships } from "../../../jobs/selectHighlightedInternships";
+import { selectHighlightedNewGrads } from "../../../jobs/selectHighlightedNewGrads";
 import { getInternshipsForCategory } from "../../../jobs/internshipStore";
+import { getNewGradsForCategory } from "../../../jobs/newGradStore";
+
+const DISCORD_MESSAGE_LIMIT = 2000;
 
 export default class Ready extends Event {
     constructor(client: DiscordClient) {
@@ -61,16 +67,28 @@ export default class Ready extends Event {
 
         scheduleJob(rule, async () => {
             try {
-                const store = await getInternshipOppertunitiesJob(this.client)();
-                const allInternships = getInternshipsForCategory("ALL", store);
-                const highlightedInternships = await selectHighlightedInternships(this.client, store);
-                const outroMessage = `**${allInternships.length}** internships were posted today.\nUse \`/fetchinternships\` with a category to see the rest.`;
-                const messages = buildInternshipMessagesWithTitle(
+                const internshipStore = await getInternshipOppertunitiesJob(this.client)();
+                const newGradStore = await getNewGradOpportunitiesJob(this.client)();
+                const allInternships = getInternshipsForCategory("ALL", internshipStore);
+                const allNewGrads = getNewGradsForCategory("ALL", newGradStore);
+                const highlightedInternships = await selectHighlightedInternships(this.client, internshipStore);
+                const highlightedNewGrads = await selectHighlightedNewGrads(this.client, newGradStore);
+                const internshipMessages = buildInternshipMessagesWithTitle(
                     highlightedInternships,
                     `**Today's highlighted internships:**`
                 );
+                const newGradMessages = buildOpportunityMessagesWithTitle(
+                    highlightedNewGrads,
+                    `**Today's highlighted new grad roles:**`
+                );
+                const messages = [
+                    ...internshipMessages,
+                    `**${allInternships.length}** internships were posted today.\nUse \`/fetchinternships\` with a category to see the rest.`,
+                    ...newGradMessages,
+                    `**${allNewGrads.length}** new grad roles were posted today.\nUse \`/fetchnewgrads\` with a category to see the rest.`,
+                ];
 
-                if (allInternships.length === 0) {
+                if (allInternships.length === 0 && allNewGrads.length === 0) {
                     return;
                 }
 
@@ -89,18 +107,55 @@ export default class Ready extends Event {
                         continue;
                     }
 
-                    for (const message of messages) {
-                        await (targetChannel as TextChannel).send(message);
-                    }
-
-                    await (targetChannel as TextChannel).send(outroMessage);
+                    await this.sendAnnouncementMessages(
+                        targetChannel as TextChannel,
+                        messages,
+                        "Daily opportunities announcement"
+                    );
                 }
             } catch (error) {
-                console.error("Error executing internship job:", error);
+                console.error("Error executing daily opportunities job:", error);
             }
         });
 
         Logger.once("setup", "Successfully set up interval sync.")
+    }
+
+    private sendAnnouncementMessages = async (
+        targetChannel: TextChannel,
+        messages: string[],
+        label: string
+    ) => {
+        const invalidMessageIndex = messages.findIndex(
+            (message) => message.length > DISCORD_MESSAGE_LIMIT
+        );
+
+        if (invalidMessageIndex !== -1) {
+            throw new Error(
+                `${label} message ${invalidMessageIndex + 1}/${messages.length} is ${messages[invalidMessageIndex].length} characters, which exceeds Discord's ${DISCORD_MESSAGE_LIMIT} character limit.`
+            );
+        }
+
+        const sentMessages: Message[] = [];
+
+        try {
+            for (const message of messages) {
+                sentMessages.push(await targetChannel.send(message));
+            }
+        } catch (error) {
+            console.error(
+                `${label} failed after sending ${sentMessages.length}/${messages.length} messages. Deleting partial announcement so the header is not left behind.`,
+                error
+            );
+
+            for (const sentMessage of sentMessages.reverse()) {
+                await sentMessage.delete().catch((deleteError) => {
+                    console.error(`${label} could not delete partial message ${sentMessage.id}:`, deleteError);
+                });
+            }
+
+            throw error;
+        }
     }
 
 

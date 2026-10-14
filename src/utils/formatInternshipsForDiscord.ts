@@ -4,11 +4,13 @@ import {
   InternshipStore,
   getInternshipsForCategory,
 } from '../jobs/internshipStore';
-
-const DISCORD_MESSAGE_LIMIT = 1900;
+import {
+  buildOpportunityMessagesWithTitle,
+  formatOpportunityPosting,
+} from './formatOpportunitiesForDiscord';
 
 export function formatInternshipPosting(posting: InternshipPosting): string {
-  return `${posting.company}: [${posting.jobTitle}](<${posting.link}>)`;
+  return formatOpportunityPosting(posting);
 }
 
 export function buildInternshipMessages(postings: InternshipPosting[]): string[] {
@@ -19,33 +21,7 @@ export function buildInternshipMessagesWithTitle(
   postings: InternshipPosting[],
   title: string,
 ): string[] {
-  if (postings.length === 0) {
-    return [];
-  }
-
-  const lines = postings.map(formatInternshipPosting);
-  const messages = [title];
-  let currentChunk = '';
-
-  for (const line of lines) {
-    const nextChunk = currentChunk ? `${currentChunk}\n${line}` : line;
-
-    if (nextChunk.length > DISCORD_MESSAGE_LIMIT) {
-      if (currentChunk) {
-        messages.push(currentChunk);
-      }
-      currentChunk = line;
-      continue;
-    }
-
-    currentChunk = nextChunk;
-  }
-
-  if (currentChunk) {
-    messages.push(currentChunk);
-  }
-
-  return messages;
+  return buildOpportunityMessagesWithTitle(postings, title);
 }
 
 export function buildInternshipMessagesForCategory(
