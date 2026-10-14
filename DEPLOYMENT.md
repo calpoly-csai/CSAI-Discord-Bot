@@ -89,7 +89,6 @@ PM2 writes application stdout and stderr logs under `~/.pm2/logs`. Install the P
 ```bash
 pm2 install pm2-logrotate
 pm2 set pm2-logrotate:retain 14
-pm2 set pm2-logrotate:max_size 10M
 pm2 set pm2-logrotate:compress true
 pm2 set pm2-logrotate:workerInterval 3600
 ```
