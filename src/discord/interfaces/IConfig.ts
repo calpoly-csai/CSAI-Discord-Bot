@@ -9,6 +9,9 @@ export interface IConfig {
         internships: {
             channel_id: string;
         },
+        new_grads?: {
+            channel_id: string;
+        },
         logs: {
             channel_id: string;
             success_roles: string[];

@@ -5,3 +5,5 @@ config.json
 credentials.json
 package-lock.json
 *.log
+job-cache
+job-output

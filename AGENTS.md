@@ -14,8 +14,14 @@ Important areas:
 
 - `src/jobs/fetchInternships.ts`
   The internship refresh pipeline. This should own pulling, parsing, normalizing, and updating the in-memory internship store.
+- `src/jobs/fetchNewGrads.ts`
+  The new-grad refresh pipeline. It mirrors the internship flow against Simplify's new-grad repo.
+- `src/jobs/opportunityParser.ts`
+  Shared README table parsing for Simplify opportunity repos.
 - `src/discord/commands/FetchInternships.ts`
   Slash command entry point for reading internship data and posting it to Discord.
+- `src/discord/commands/FetchNewGrads.ts`
+  Slash command entry point for reading cached new-grad data and posting it to Discord.
 - `src/discord/events/client/Ready.ts`
   Startup logic, command registration, and the scheduled internship refresh/post.
 - `src/jobs/sendInternshipJobSummary.ts`
@@ -27,6 +33,8 @@ External dependency:
 
 - `../Summer2027-Internships`
   Separate repo whose `README.md` is currently parsed for internship data.
+- `../New-Grad-Positions`
+  Separate repo whose `README.md` is currently parsed for new-grad data.
 
 ## Required Internship Architecture
 
