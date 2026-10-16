@@ -32,14 +32,25 @@ export default class Ready extends Event {
 
         if (!this.verifySecrets()) return;
 
-        this.registerCommands();
+        await this.registerCommands();
         this.setupSync();
     }
 
     private registerCommands = async () => {
-        // format the commands into JSON to send tot discord
-        const commands: object[] = this.GetJson(this.client.commands);
         const rest = new REST().setToken(process.env.DISCORD_APP_TOKEN!);
+
+        // Remove commands registered by older versions of the bot at guild scope.
+        // Guild and global commands are separate Discord resources, so changing
+        // the registration route does not remove the old guild commands.
+        await rest.put(Routes.applicationGuildCommands(
+            process.env.DISCORD_CLIENT_ID!,
+            CONFIG.discord.server_id,
+        ), {
+            body: []
+        });
+
+        // Format the commands into JSON to send to Discord.
+        const commands: object[] = this.GetJson(this.client.commands);
 
         const setCommands: any = await rest.put(Routes.applicationCommands(
             process.env.DISCORD_CLIENT_ID!,
